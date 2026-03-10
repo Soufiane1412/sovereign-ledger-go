@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/soufiane1412/sovereign-ledger-go/internal/engine"
-	"github.com/soufiane1412/sovereign-ledger-go/internal/models"
+	"github.com/Soufiane1412/sovereign-ledger-go/internal/engine"
+	"github.com/Soufiane1412/sovereign-ledger-go/internal/models"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	// 1. Initialise Channels (The 'Pipes')
 
 	jobs := make(chan models.Transaction, tradeLoad)
-	results := make(chan models.SettlementResult, tradeload)
+	results := make(chan models.SettlementResult, tradeLoad)
 
 	fmt.Println("System Boot: Initialising Sovereign Settlement Nodes...")
 
