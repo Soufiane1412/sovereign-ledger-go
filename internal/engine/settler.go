@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/soufiane1412/sovereign-ledger-go/internal/models"
+	"github.com/Soufiane1412/sovereign-ledger-go/internal/models"
 )
 
 // StartSettler acts as a sovereign node processing trades
@@ -35,7 +35,7 @@ func StartSettler(nodeID int, jobs <-chan models.Transaction, results chan<- mod
 
 		// 3. Output the result to the synchronisation channel
 		results <- models.SettlementResult{
-			transactionID: tx.ID,
+			TransactionID: tx.ID,
 			Status:        models.StatusSettled,
 			Message:       "Trade Settled Locally",
 			ProcessedBy:   nodeID,
