@@ -13,13 +13,14 @@ const (
 )
 
 type Transaction struct {
-	ID            string            `json:"id"`
-	DebitAccount  string            `json:"debit_account_id"`
-	CreditAccount string            `json:"credit_account_id"`
-	Amount        int64             `json:"amount"`
-	Currency      string            `json:"currency"`
-	Metadata      map[string]string `json:"metadata"`
-	Timestamp     time.Time         `json:"timestamp"`
+	ID             string            `json:"id"`
+	IdempotencyKey string            `json:"idempotency_key"`
+	DebitAccount   string            `json:"debit_account_id"`
+	CreditAccount  string            `json:"credit_account_id"`
+	Amount         int64             `json:"amount"`
+	Currency       string            `json:"currency"`
+	Metadata       map[string]string `json:"metadata"`
+	Timestamp      time.Time         `json:"timestamp"`
 }
 
 type SettlementResult struct {
