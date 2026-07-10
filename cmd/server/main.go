@@ -23,7 +23,7 @@ func main() {
 		tradeLoad     = 10000            // Total transactions to simulate
 		jobBuffer     = 256              // See Ba kpressure note below
 		resultBuffer  = 256              // Independant downstream backpressure
-		shutdownGrace = 35 * time.Second // Max wait for graceful exit
+		shutdownGrace = 20 * time.Second // Max wait for graceful exit
 	)
 
 	//
@@ -138,26 +138,32 @@ func main() {
 	// Range exits naturally when the channel closes. Count-based loops are
 	// fragile: if one worker dies silently, the count is wrong → main hangs.
 	// Range + closer-goroutine = robust under partial failure.
-	var settled, failed int
-	for res := range results {
-		switch res.Status {
-		case models.StatusSettled:
-			settled++
-		case models.StatusFailed:
-			failed++
-			logger.Warn("audit_alert",
-				"tx_id", res.TransactionID,
-				"reason", res.Message,
-				"node", res.ProcessedBy)
-		}
-	}
 
-	// ──────────────────────────────────────────────────────────────────
-	// 10. FINAL REPORT — Reconciliation
-	// ──────────────────────────────────────────────────────────────────
-	logger.Info("settlement_complete",
-		"settled", settled,
-		"failed", failed,
-		"total", settled+failed)
+	type tally struct{ settled, failed int }
+	done := make(chan tally, 1)
+	go func() {
+		var t tally
+		for res := range results {
+			switch res.Status {
+			case models.StatusSettled:
+				t.settled++
+			case models.StatusFailed:
+				t.failed++
+				logger.Warn("audit_alert",
+					"tx_id", res.TransactionID,
+					"reason", res.Message,
+					"node", res.ProcessedBy)
+			}
+		}
+		done <- t
+	}()
+
+	select {
+	case t := <-done:
+		logger.Info("settlement_complete", "settled", t.settled, "failed", t.failed, "total", t.settled+t.failed)
+	case <-time.After(shutdownGrace):
+		logger.Error("shutdown_grace_exceeded", "grace", shutdownGrace)
+
+	}
 
 }
