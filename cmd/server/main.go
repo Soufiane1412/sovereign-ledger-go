@@ -20,10 +20,10 @@ func main() {
 
 	const (
 		numNodes      = 100              // Total concurrent workers
-		tradeLoad     = 10000            // Total transactions to simulate
-		jobBuffer     = 256              // See Ba kpressure note below
+		tradeLoad     = 1000000          // Total transactions to simulate
+		jobBuffer     = 256              // See Backpressure note below
 		resultBuffer  = 256              // Independant downstream backpressure
-		shutdownGrace = 20 * time.Second // Max wait for graceful exit
+		shutdownGrace = 25 * time.Second // Max wait for graceful exit
 	)
 
 	//
@@ -51,6 +51,7 @@ func main() {
 	// 🧠 In Kubernetes, the orchestrator sends SIGTERM before killing the pod.
 	// Ignore it → you crash mid-settlement → SAMA auditor screams. Catching
 	// SIGTERM and cancelling ctx lets workers drain cleanly before exit.
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -90,7 +91,7 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	// 7. CLOSER GOROUTINE — The graceful-shutdown idiom
 	// ──────────────────────────────────────────────────────────────────
-	// 🧠 THIS is the load-bearing pattern. Without it, you have two bad options:
+	// 🧠 THIS is the load-bearing pattern. Without it, you have two bad options:3331
 	//   (a) never close results → consumer hangs forever
 	//   (b) close results too early → worker panics sending to closed channel
 	// The closer goroutine bridges main's knowledge ("WaitGroup done?") with
