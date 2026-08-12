@@ -7,7 +7,7 @@ import (
 	"log"
 	"sync"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 func worker(
@@ -19,50 +19,68 @@ func worker(
 	mySignal chan struct{},
 	otherSignal chan struct{},
 ) {
-
 	defer wg.Done()
 
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: isolation})
-	if err != nil {
-		log.Printf("hold %d: begin: %v", holdAmount, err)
-		return
-	}
+	maxAttempts := 25
+	for attempts := 0; attempts < maxAttempts; attempts++ {
 
-	defer tx.Rollback()
+		tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: isolation})
+		if err != nil {
+			log.Printf("hold%d: begin =%v", holdAmount, err)
+			return
+		}
 
-	var available int
+		var available int
 
-	if err := tx.QueryRow(`
-		SELECT a.balance - COALESCE(SUM(h.amount),0)
-		FROM accounts a
-		LEFT JOIN pending_holds h ON h.account_id = a.id
-		WHERE a.id = $1
-		GROUP BY a.balance`, 1).Scan(&available); err != nil {
-		log.Printf("hold%d: read: %v", holdAmount, err)
-		return
-	}
-	log.Printf("hold%d: see: %v", holdAmount, available)
+		if err := tx.QueryRow(`
+			SELECT a.balance - COALESCE(SUM(h.amount),0)
+			FROM accounts a
+			LEFT JOIN pending_holds h ON h.account_id = a.id
+			WHERE a.id = $1
+			GROUP BY a.balance`, 1).Scan(&available); err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "40001" {
+				tx.Rollback()
+				continue
+			}
+			tx.Rollback()
+			return
+		}
 
-	mySignal <- struct{}{}
-	<-otherSignal
+		if attempts == 0 {
 
-	if holdAmount > available {
-		log.Printf("hold%d: REJECTED (available=%v)", holdAmount, available)
-		return
-	}
+			mySignal <- struct{}{}
+			<-otherSignal
+		}
 
-	if _, err := tx.Exec(`
+		if holdAmount > available {
+			tx.Rollback()
+			log.Printf("hold%d: REJECTED (available=%v)", holdAmount, available)
+			return
+		}
+
+		if _, err := tx.Exec(`
 		INSERT INTO pending_holds (account_id, amount) VALUES ($1, $2)`, 1, holdAmount); err != nil {
-		log.Printf("hold%d: insert =%v", holdAmount, err)
-		return
-	}
 
-	if err := tx.Commit(); err != nil {
-		log.Printf("hold %d: Commit =%v", holdAmount, err)
-		return
-	}
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "40001" {
+				tx.Rollback()
+				continue
+			}
+			tx.Rollback()
+			return
+		}
 
-	log.Printf("hold%d: COMMITTED", holdAmount)
+		if err := tx.Commit(); err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "40001" {
+				tx.Rollback()
+				continue
+			}
+			tx.Rollback()
+			return
+		}
+
+		log.Printf("hold%d: COMMITTED", holdAmount)
+
+	}
 }
 
 func main() {
@@ -74,7 +92,7 @@ func main() {
 	defer db.Close()
 
 	ctx := context.Background()
-	iso := sql.LevelRepeatableRead
+	iso := sql.LevelSerializable
 
 	//Concurrency contract:
 
