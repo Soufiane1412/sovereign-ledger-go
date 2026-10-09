@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -21,8 +22,19 @@ func worker(
 ) {
 	defer wg.Done()
 
-	maxAttempts := 25
+	const (
+		baseDelay = 5 * time.Millisecond
+		maxDelay = 500 * time.Millisecond
+	)
+
+
+	maxAttempts := 6
 	for attempts := 0; attempts < maxAttempts; attempts++ {
+
+		delay := baseDelay << attempts
+		if delay > maxDelay {
+			delay = maxDelay
+		}
 
 		tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: isolation})
 		if err != nil {
@@ -31,7 +43,6 @@ func worker(
 		}
 
 		var available int
-
 		if err := tx.QueryRow(`
 			SELECT a.balance - COALESCE(SUM(h.amount),0)
 			FROM accounts a
@@ -40,6 +51,11 @@ func worker(
 			GROUP BY a.balance`, 1).Scan(&available); err != nil {
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "40001" {
 				tx.Rollback()
+				select {
+				case <- ctx.Done():
+					return
+				case <- time.After(sleep)
+				}
 				continue
 			}
 			tx.Rollback()
