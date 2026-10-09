@@ -49,6 +49,8 @@ experiments/writeskew/     write-skew scenario (isolated main)
 
 - [x] Concurrency block (priority select, bounded shutdown, LIFO defers)
 - [x] Write-skew anomaly (RR reproduction, Serializable + retry close)
-- [ ] Remaining ACID anomalies (dirty read, non-repeatable read, phantom)
+- [x] Dirty read anomaly (simulated uncommitted-state mutation, MVCC bypass)
+- [ ] Non-repeatable read anomaly
+- [ ] Phantom anomaly
 - [ ] Property-based tests (`pgregory.net/rapid`) generating interleavings
 - [ ] `specs/` — invariant in precise English
