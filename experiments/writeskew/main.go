@@ -24,9 +24,8 @@ func worker(
 
 	const (
 		baseDelay = 5 * time.Millisecond
-		maxDelay = 500 * time.Millisecond
+		maxDelay  = 500 * time.Millisecond
 	)
-
 
 	maxAttempts := 6
 	for attempts := 0; attempts < maxAttempts; attempts++ {
@@ -52,9 +51,9 @@ func worker(
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "40001" {
 				tx.Rollback()
 				select {
-				case <- ctx.Done():
+				case <-ctx.Done():
 					return
-				case <- time.After(sleep)
+				case <-time.After(delay):
 				}
 				continue
 			}
@@ -95,6 +94,7 @@ func worker(
 		}
 
 		log.Printf("hold%d: COMMITTED", holdAmount)
+		return
 
 	}
 }
